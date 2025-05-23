@@ -18,16 +18,12 @@ PRODUCTS = [
         "name": "Pulidora Orbital Trupper",
         "url":  "https://www.amazon.com.mx/gp/product/B0BNW5RQN6/ref=ox_sc_act_title_15?smid=AVDBXBAVVSXLQ&psc=1",
     },
-    # …add more here
 ]
 
-# ─────────── STORAGE PATHS ───────────
-# Put your history file in the repo root so we can commit it
 BASE_DIR     = os.getcwd()
 CSV_FILE     = os.path.join(BASE_DIR, "AmazonProductsPriceDataset.csv")
 HISTORY_FILE = os.path.join(BASE_DIR, "AmazonLastPrices.csv")
 
-# ─────────── TWILIO CLIENT ───────────
 client = Client(
     os.getenv("TWILIO_ACCOUNT_SID"),
     os.getenv("TWILIO_AUTH_TOKEN")
@@ -50,18 +46,15 @@ def fetch_price(name, url):
     resp = requests.get(url, headers=headers, timeout=(5,15))
     resp.raise_for_status()
     soup = BeautifulSoup(resp.text, "html.parser")
-
     title_el = soup.find(id="productTitle")
     title = title_el.get_text(strip=True) if title_el else name
 
-    # try standard selectors
     price_str = None
     for sel in ("#priceblock_ourprice","#priceblock_dealprice","#priceblock_saleprice"):
         el = soup.select_one(sel)
         if el and el.get_text(strip=True):
             price_str = el.get_text(strip=True)
             break
-    # fallbacks...
     if not price_str:
         m = soup.find("meta",{"itemprop":"price"})
         price_str = m["content"] if m and m.get("content") else None
