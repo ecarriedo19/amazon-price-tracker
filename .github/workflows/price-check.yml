@@ -40,13 +40,13 @@ jobs:
         run: python amazon_tracker.py
 
       - name: Commit updated history
+        shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # pull any manual changes, rebase our history file commit on top
-          git pull --rebase origin main
           git add AmazonLastPrices.csv
           git commit -m "chore: update price history" || echo "No changes to commit"
-          git push
+          # force-with-lease to prevent non–fast-forward errors when runs overlap
+          git push --force-with-lease origin main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
