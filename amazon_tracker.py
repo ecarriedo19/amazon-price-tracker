@@ -18,11 +18,11 @@ PRODUCTS = [
         "name": "Pulidora Orbital Trupper",
         "url":  "https://www.amazon.com.mx/gp/product/B0BNW5RQN6/ref=ox_sc_act_title_15?smid=AVDBXBAVVSXLQ&psc=1",
     },
-    # …add more here
+    # …añade más productos aquí si quieres
 ]
 
 # ─────────── STORAGE PATHS ───────────
-BASE_DIR     = os.getcwd()  # repo root
+BASE_DIR     = os.getcwd()
 CSV_FILE     = os.path.join(BASE_DIR, "AmazonProductsPriceDataset.csv")
 HISTORY_FILE = os.path.join(BASE_DIR, "AmazonLastPrices.csv")
 
@@ -32,8 +32,7 @@ client = Client(
     os.getenv("TWILIO_AUTH_TOKEN")
 )
 
-def send_whatsapp(title, price, prev_price):
-    body = f"{title}\nAntes: ${prev_price:.2f} → Ahora: ${price:.2f}"
+def send_whatsapp(body):
     client.messages.create(
         body=body,
         from_=f"whatsapp:{os.getenv('TWILIO_WHATSAPP_FROM')}",
@@ -53,14 +52,12 @@ def fetch_price(name, url):
     title_el = soup.find(id="productTitle")
     title = title_el.get_text(strip=True) if title_el else name
 
-    # try price selectors
     price_str = None
     for sel in ("#priceblock_ourprice", "#priceblock_dealprice", "#priceblock_saleprice"):
         el = soup.select_one(sel)
         if el and el.get_text(strip=True):
             price_str = el.get_text(strip=True)
             break
-    # fallbacks
     if not price_str:
         m = soup.find("meta", {"itemprop": "price"})
         price_str = m["content"] if m and m.get("content") else None
@@ -72,7 +69,6 @@ def fetch_price(name, url):
         f = soup.select_one("span.a-price-fraction")
         if w and f:
             price_str = f"{w.get_text(strip=True)}.{f.get_text(strip=True)}"
-
     if not price_str:
         return title, None
 
@@ -133,9 +129,19 @@ def main():
         prev = last_seen.get(key)
         if price is not None and prev is not None and price != prev:
             diff = price - prev
-            arrow = "⬆️" if diff > 0 else "⬇️"
+            pct  = (diff / prev) * 100
+            direction = "subió" if diff > 0 else "bajó"
+            arrow     = "⬆️" if diff > 0 else "⬇️"
+            body = (
+                "Bot Price Tracker\n"
+                f"- Uno de tus productos {direction} de precio:\n"
+                f"- {title}\n"
+                f"- Antes: ${prev:.2f} → Ahora: ${price:.2f}\n"
+                f"- Cambio: {arrow} {abs(pct):.2f}%\n"
+                f"- Checar en: {prod['url']}"
+            )
             print(f"Price changed ({arrow}{abs(diff):.2f}) → sending alert")
-            send_whatsapp(arrow + " " + title, price, prev_price=prev)
+            send_whatsapp(body)
 
         new_seen[key] = price
         time.sleep(random.uniform(5, 10))
