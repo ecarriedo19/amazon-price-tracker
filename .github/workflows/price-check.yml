@@ -17,9 +17,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
         with:
-          # ensure we pull full history so csv commits merge cleanly
           fetch-depth: 0
-          # allow push back to this repo
           persist-credentials: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -45,6 +43,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          # pull any manual changes, rebase our history file commit on top
+          git pull --rebase origin main
           git add AmazonLastPrices.csv
           git commit -m "chore: update price history" || echo "No changes to commit"
           git push
