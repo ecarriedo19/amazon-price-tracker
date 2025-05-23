@@ -20,11 +20,11 @@ PRODUCTS = [
         "url":  "https://www.amazon.com.mx/gp/product/B0BNW5RQN6/ref=ox_sc_act_title_15?smid=AVDBXBAVVSXLQ&psc=1",
         "threshold": 1900.00
     },
-    # …add more here if you like
+    # …add more here if needed
 ]
 
 # ─────────── STORAGE PATHS ───────────
-BASE_DIR     = "/tmp"  # on GitHub Actions this is ephemeral; locally change to a folder you want
+BASE_DIR     = "/tmp"  # Locally change to your folder, e.g. r"C:\Users\usuario\…"
 CSV_FILE     = os.path.join(BASE_DIR, "AmazonProductsPriceDataset.csv")
 HISTORY_FILE = os.path.join(BASE_DIR, "AmazonLastPrices.csv")
 
@@ -34,19 +34,14 @@ client = Client(
     os.getenv("TWILIO_AUTH_TOKEN")
 )
 
-def send_whatsapp(title, price, prev_price=None):
+def send_whatsapp(title, price, prev_price):
     """
-    Sends a WhatsApp via Twilio. If prev_price is given,
-    includes before→after; otherwise just shows the price.
+    Sends a WhatsApp via Twilio showing before→after.
     """
-    if prev_price is not None:
-        body = (
-            f"{title}\n"
-            f"Antes: ${prev_price:.2f} → Ahora: ${price:.2f}"
-        )
-    else:
-        body = f"{title}\nPrecio: ${price:.2f} MXN"
-
+    body = (
+        f"{title}\n"
+        f"Antes: ${prev_price:.2f} → Ahora: ${price:.2f}"
+    )
     client.messages.create(
         body=body,
         from_=f"whatsapp:{os.getenv('TWILIO_WHATSAPP_FROM')}",
@@ -54,7 +49,6 @@ def send_whatsapp(title, price, prev_price=None):
     )
 
 def fetch_price(name, url):
-    # rotate UA
     ua = random.choice([
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"
@@ -64,19 +58,15 @@ def fetch_price(name, url):
     resp.raise_for_status()
     soup = BeautifulSoup(resp.text, "html.parser")
 
-    # title
     title_el = soup.find(id="productTitle")
     title = title_el.get_text(strip=True) if title_el else name
 
-    # price selectors
     price_str = None
     for sel in ("#priceblock_ourprice","#priceblock_dealprice","#priceblock_saleprice"):
         el = soup.select_one(sel)
         if el and el.get_text(strip=True):
             price_str = el.get_text(strip=True)
             break
-
-    # fallbacks
     if not price_str:
         m = soup.find("meta",{"itemprop":"price"})
         price_str = m["content"] if m and m.get("content") else None
@@ -144,7 +134,7 @@ def main():
         print(f"{now} | {title[:30]:30} | ${price}")
 
         prev = last_seen.get(title)
-        # alert only if we have a previous price AND it differs
+        # Only send when we have a previous price AND it differs
         if price is not None and prev is not None and price != prev:
             diff = price - prev
             direction = "⬆️" if diff > 0 else "⬇️"
@@ -158,3 +148,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
