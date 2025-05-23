@@ -1,7 +1,12 @@
 name: Scheduled Price Check
 
+# Allow the workflow to push commits back to the repo
+permissions:
+  contents: write
+
 on:
   schedule:
+    # Run every 30 minutes
     - cron: '*/30 * * * *'
 
 jobs:
@@ -13,6 +18,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
+          # Keep credentials so we can push later
           persist-credentials: true
 
       - name: Set up Python
