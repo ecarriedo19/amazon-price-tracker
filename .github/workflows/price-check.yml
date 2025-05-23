@@ -1,9 +1,5 @@
 name: Scheduled Price Check
 
-# Grant write access so GITHUB_TOKEN can push commits
-permissions:
-  contents: write
-
 on:
   schedule:
     # every 30 minutes
@@ -16,10 +12,12 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
+
+      - name: Restore price history from cache
+        uses: actions/cache@v3
         with:
-          fetch-depth: 0
-          persist-credentials: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+          path: AmazonLastPrices.csv
+          key: price-history
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -39,14 +37,8 @@ jobs:
           WHATSAPP_TO:          ${{ secrets.WHATSAPP_TO }}
         run: python amazon_tracker.py
 
-      - name: Commit updated history
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add AmazonLastPrices.csv
-          git commit -m "chore: update price history" || echo "No changes to commit"
-          # force-with-lease to prevent non–fast-forward errors when runs overlap
-          git push --force-with-lease origin main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Save updated price history to cache
+        uses: actions/cache@v3
+        with:
+          path: AmazonLastPrices.csv
+          key: price-history
