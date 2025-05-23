@@ -20,22 +20,33 @@ PRODUCTS = [
         "url":  "https://www.amazon.com.mx/gp/product/B0BNW5RQN6/ref=ox_sc_act_title_15?smid=AVDBXBAVVSXLQ&psc=1",
         "threshold": 1900.00
     },
-    # …add more products here
+    # …add more here if you like
 ]
 
-# Where to store your logs & history
-BASE_DIR     = "/tmp"  # change this to a persistent folder if running locally, e.g. r"C:\Users\usuario\…"
+# ─────────── STORAGE PATHS ───────────
+BASE_DIR     = "/tmp"  # on GitHub Actions this is ephemeral; locally change to a folder you want
 CSV_FILE     = os.path.join(BASE_DIR, "AmazonProductsPriceDataset.csv")
 HISTORY_FILE = os.path.join(BASE_DIR, "AmazonLastPrices.csv")
 
-# Twilio WhatsApp client (populated from GitHub Actions secrets or your local env vars)
+# ─────────── TWILIO CLIENT ───────────
 client = Client(
     os.getenv("TWILIO_ACCOUNT_SID"),
     os.getenv("TWILIO_AUTH_TOKEN")
 )
 
-def send_whatsapp(title, price):
-    body = f"{title}\nPrecio: ${price:.2f} MXN"
+def send_whatsapp(title, price, prev_price=None):
+    """
+    Sends a WhatsApp via Twilio. If prev_price is given,
+    includes before→after; otherwise just shows the price.
+    """
+    if prev_price is not None:
+        body = (
+            f"{title}\n"
+            f"Antes: ${prev_price:.2f} → Ahora: ${price:.2f}"
+        )
+    else:
+        body = f"{title}\nPrecio: ${price:.2f} MXN"
+
     client.messages.create(
         body=body,
         from_=f"whatsapp:{os.getenv('TWILIO_WHATSAPP_FROM')}",
@@ -43,6 +54,7 @@ def send_whatsapp(title, price):
     )
 
 def fetch_price(name, url):
+    # rotate UA
     ua = random.choice([
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"
@@ -52,18 +64,19 @@ def fetch_price(name, url):
     resp.raise_for_status()
     soup = BeautifulSoup(resp.text, "html.parser")
 
-    # Title
+    # title
     title_el = soup.find(id="productTitle")
     title = title_el.get_text(strip=True) if title_el else name
 
-    # Price selectors
+    # price selectors
     price_str = None
     for sel in ("#priceblock_ourprice","#priceblock_dealprice","#priceblock_saleprice"):
         el = soup.select_one(sel)
         if el and el.get_text(strip=True):
             price_str = el.get_text(strip=True)
             break
-    # Fallbacks
+
+    # fallbacks
     if not price_str:
         m = soup.find("meta",{"itemprop":"price"})
         price_str = m["content"] if m and m.get("content") else None
@@ -94,15 +107,16 @@ def fetch_price(name, url):
 def append_csv(record):
     os.makedirs(BASE_DIR, exist_ok=True)
     exists = os.path.isfile(CSV_FILE)
-    with open(CSV_FILE,"a",newline="",encoding="utf-8") as f:
-        w = csv.DictWriter(f,fieldnames=["timestamp","name","url","price"])
-        if not exists: w.writeheader()
+    with open(CSV_FILE, "a", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=["timestamp","name","url","price"])
+        if not exists:
+            w.writeheader()
         w.writerow(record)
 
 def load_last_prices():
     last = {}
     if os.path.exists(HISTORY_FILE):
-        with open(HISTORY_FILE,newline="",encoding="utf-8") as f:
+        with open(HISTORY_FILE, newline="", encoding="utf-8") as f:
             reader = csv.DictReader(f)
             for row in reader:
                 try:
@@ -112,49 +126,34 @@ def load_last_prices():
     return last
 
 def save_last_prices(prices):
-    with open(HISTORY_FILE,"w",newline="",encoding="utf-8") as f:
-        w = csv.DictWriter(f,fieldnames=["name","price"])
+    with open(HISTORY_FILE, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=["name","price"])
         w.writeheader()
         for name, price in prices.items():
             w.writerow({"name": name, "price": price})
 
 def main():
-    # ensure BASE_DIR exists
     os.makedirs(BASE_DIR, exist_ok=True)
-
-    # load last run prices
     last_seen = load_last_prices()
     new_seen  = {}
 
     for p in PRODUCTS:
-        title, price = None, None
-        try:
-            title, price = fetch_price(p["name"], p["url"])
-        except Exception as e:
-            print(f"✖ Error fetching {p['name']}: {e}")
-            continue
-
+        title, price = fetch_price(p["name"], p["url"])
         now = datetime.utcnow().isoformat()
         append_csv({"timestamp": now, "name": title, "url": p["url"], "price": price})
         print(f"{now} | {title[:30]:30} | ${price}")
 
         prev = last_seen.get(title)
-        # if we’ve seen it before and price changed:
+        # alert only if we have a previous price AND it differs
         if price is not None and prev is not None and price != prev:
-            diff      = price - prev
+            diff = price - prev
             direction = "⬆️" if diff > 0 else "⬇️"
             print(f"Price changed ({direction}{abs(diff):.2f}) → sending alert")
-            send_whatsapp(f"{direction} {title}", price)
-
-        # first time we ever see it:
-        elif price is not None and prev is None:
-            print("First check for this item → sending initial alert")
-            send_whatsapp(f"✔️ {title}", price)
+            send_whatsapp(direction + " " + title, price, prev_price=prev)
 
         new_seen[title] = price
         time.sleep(random.uniform(5,10))
 
-    # save for next run
     save_last_prices(new_seen)
 
 if __name__ == "__main__":
