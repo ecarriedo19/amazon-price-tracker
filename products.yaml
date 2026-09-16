@@ -1,0 +1,20 @@
+# Products to track. Only `name` and `url` are required.
+#
+#   target_price:  alert once when the price falls to or below this amount
+#   threshold_pct: alert when the price moves by at least this % (overrides the default)
+#
+# Any Amazon product URL works; tracking junk is stripped down to /dp/<ASIN>.
+
+settings:
+  threshold_pct: 5        # default % change that triggers an alert
+  locale: en              # alert language: en or es
+  delay_seconds: [3, 8]   # random pause between products (be polite)
+
+products:
+  - name: Karcher K2 Pressure Washer
+    url: https://www.amazon.com.mx/dp/B0CM49Z6SN
+    target_price: 1800
+
+  - name: Truper Orbital Polisher
+    url: https://www.amazon.com.mx/dp/B0BNW5RQN6
+    threshold_pct: 3

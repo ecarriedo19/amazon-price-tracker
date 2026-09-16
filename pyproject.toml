@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "amazon-price-tracker"
+version = "1.0.0"
+description = "Track Amazon product prices, keep a price history, and get WhatsApp alerts on drops."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Ethan Carriedo" }]
+requires-python = ">=3.11"
+dependencies = [
+    "beautifulsoup4>=4.12",
+    "matplotlib>=3.8",
+    "pyyaml>=6.0",
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+whatsapp = ["twilio>=9.0"]
+dev = ["pytest>=8.0", "ruff>=0.6"]
+
+[project.scripts]
+price-tracker = "price_tracker.cli:main"
+
+[tool.setuptools]
+packages = ["price_tracker"]
+
+[tool.setuptools.package-data]
+price_tracker = ["demo_pages/*.html"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+ignore = ["SIM108"]  # an explicit if/else is often clearer than a ternary
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
